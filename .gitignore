@@ -130,3 +130,5 @@ dmypy.json
 
 # IDE files
 .idea/
+
+demos/speech-recognition/deepspeech-english-models.squashfs
