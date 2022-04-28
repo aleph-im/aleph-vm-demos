@@ -13,13 +13,14 @@ app = AlephApp(http_app=http_app)
 
 
 def process_audio(audio_file: str):
+    os.environ["PYTHONPATH"] = f"/opt/packages:{os.getenv('PYTHONPATH', default=None)}"
     result = subprocess.run(
         [
-            "deepspeech",
+            "/opt/packages/bin/deepspeech",
             "--model",
-            "lib/deepspeech-0.9.3-models.pbmm",
+            "/model/deepspeech-0.9.3-models.pbmm",
             "--scorer",
-            "lib/deepspeech-0.9.3-models.scorer",
+            "/model/deepspeech-0.9.3-models.scorer",
             "--audio",
             audio_file,
         ],
@@ -47,7 +48,7 @@ async def process_audio_from_file(filename: str):
 async def process_audio_from_aleph_storage(file_hash: str):
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
         async with session.get(
-                f"https://aleph.cloud/api/v0/storage/raw/{file_hash}"
+            f"https://api2.aleph.im/api/v0/storage/raw/{file_hash}"
         ) as response:
             if response.status != 200:
                 response_text = await response.text()
