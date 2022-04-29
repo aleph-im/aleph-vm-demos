@@ -4,10 +4,9 @@ import subprocess
 
 import aiohttp
 from aleph_client.vm.app import AlephApp
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 
 logger = logging.getLogger(__name__)
-
 
 http_app = FastAPI()
 app = AlephApp(http_app=http_app)
@@ -29,19 +28,18 @@ def process_audio(audio_file: str):
     return result.stdout.strip()
 
 
-@app.get("/")
-async def index():
-    return "Hello world"
+@app.post("/upload-audio-file")
+async def upload_audio_file(file: UploadFile = File(...)):
+    content = await file.read()
+    with open(f"/tmp/{file.filename}", "wb") as f:
+        f.write(content)
 
 
-@app.get("/ipfs/{ipfs_hash}")
-async def process_audio_from_ipfs(ipfs_hash: str):
-    ...
-
-
-@app.get("/file/{file_path}")
-async def process_audio_from_file(file_path: str):
-    file_path = "lib/audio" + file_path
+@app.get("/speech-to-text/file/{filename}")
+async def process_audio_from_file(filename: str):
+    file_path = os.path.join("/tmp", filename)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Audio file not found.")
     return process_audio(file_path)
 
 
@@ -49,7 +47,7 @@ async def process_audio_from_file(file_path: str):
 async def process_audio_from_aleph_storage(file_hash: str):
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
         async with session.get(
-            f"https://aleph.cloud/api/v0/storage/raw/{file_hash}"
+                f"https://aleph.cloud/api/v0/storage/raw/{file_hash}"
         ) as response:
             if response.status != 200:
                 response_text = await response.text()
