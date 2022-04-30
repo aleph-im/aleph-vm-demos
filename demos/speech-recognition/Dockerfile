@@ -1,4 +1,4 @@
-FROM rust:bullseye
+FROM debian:bullseye
 
 RUN apt-get update && apt-get -y upgrade && apt-get install -y \
      libsecp256k1-dev \
@@ -6,7 +6,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y \
      squashfs-tools \
      && rm -rf /var/lib/apt/lists/*
 
-RUN pip install aleph-client
+RUN pip install aleph-client==0.4.8
 
 WORKDIR /usr/src/speech-recognition
 COPY . .
