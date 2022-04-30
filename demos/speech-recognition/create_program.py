@@ -88,6 +88,7 @@ def main():
         api_server=settings.API_HOST,
         memory=4000,
         vcpus=4,
+        timeout_seconds=180,
         encoding=Encoding.squashfs,
         volumes=volumes,
     )
