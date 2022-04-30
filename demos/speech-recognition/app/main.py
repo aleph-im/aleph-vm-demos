@@ -5,10 +5,13 @@ import tempfile
 
 import aiohttp
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from aleph_message.models import ItemType
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+ALEPH_API_SERVER = "https://api2.aleph.im"
 
 
 def process_audio(audio_file: str):
@@ -43,11 +46,16 @@ async def process_audio_from_file(filename: str):
     return process_audio(file_path)
 
 
-async def download_audio_from_aleph(file_hash) -> bytes:
+async def get_file_from_storage(content_hash: str, content_type: ItemType) -> bytes:
+    if content_type == ItemType.storage:
+        uri = f"{ALEPH_API_SERVER}/api/v0/storage/raw/{content_hash}"
+    elif content_type == ItemType.ipfs:
+        uri = f"https://ipfs.io/ipfs/{content_hash}"
+    else:
+        raise ValueError(f"Unsupported item type: {content_type}")
+
     async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
-        async with session.get(
-            f"https://api2.aleph.im/api/v0/storage/raw/{file_hash}"
-        ) as response:
+        async with session.get(uri) as response:
             if response.status != 200:
                 response_text = await response.text()
                 raise HTTPException(status_code=response.status, detail=response_text)
@@ -55,9 +63,27 @@ async def download_audio_from_aleph(file_hash) -> bytes:
             return await response.read()
 
 
-@app.get("/speech-to-text/aleph/{file_hash}")
-async def process_audio_from_aleph_storage(file_hash: str):
-    audio_data: bytes = await download_audio_from_aleph(file_hash=file_hash)
+async def download_audio_from_aleph(message_hash: str) -> bytes:
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector()) as session:
+        async with session.get(
+            f"{ALEPH_API_SERVER}/api/v0/messages.json?hashes={message_hash}"
+        ) as response:
+            if response.status != 200:
+                response_text = await response.text()
+                raise HTTPException(status_code=response.status, detail=response_text)
+
+            aleph_message = (await response.json())["messages"][0]
+
+    content = aleph_message["content"]
+    item_type = ItemType(content["item_type"])
+
+    audio_data = await get_file_from_storage(content["item_hash"], item_type)
+    return audio_data
+
+
+@app.get("/speech-to-text/aleph/{message_hash}")
+async def process_audio_from_aleph_storage(message_hash: str):
+    audio_data: bytes = await download_audio_from_aleph(message_hash=message_hash)
     with tempfile.NamedTemporaryFile() as audio_file:
         audio_file.write(audio_data)
         audio_file.flush()
